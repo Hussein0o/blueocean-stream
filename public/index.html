@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>BlueOcean Stream</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0b132b;
+      color: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #data-box {
+      background: #1c2541;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px #3a506b;
+      width: 400px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>📊 BlueOcean Live Stream By Hussein</h1>
+  <div id="data-box">
+    <p>في انتظار البيانات...</p>
+  </div>
+
+  <script>
+    const socket = io();
+
+    socket.on('update', (msg) => {
+      const box = document.getElementById('data-box');
+      const data = msg.payload;
+      box.innerHTML = `
+        <h3>📅 ${new Date(msg.ts).toLocaleTimeString()}</h3>
+        <p><strong>Title:</strong> ${data.title}</p>
+      `;
+    });
+  </script>
+</body>
+</html>
+
