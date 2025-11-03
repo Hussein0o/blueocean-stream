@@ -12,56 +12,64 @@ app.use(express.static('public'));
 
 let browser, page;
 
-// ✅ 1. دالة لتشغيل المتصفح والدخول للموقع
-async function startBrowserAndLogin() {
-  browser = await puppeteer.launch({
-    headless: true, // خليه true لأننا على سيرفر بدون واجهة
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-zygote',
-      '--single-process'
-    ]
-  });
-
-  page = await browser.newPage();
-
-  console.log('🌍 openning page ...');
-  await page.goto(process.env.BLUEOCEAN_URL, { waitUntil: 'networkidle2', timeout: 60000 });
-
-  console.log('✅ succesfully opened');
-}
-
-// ✅ 2. دالة لجمع البيانات وبثها عبر Socket.io
-async function scrapeAndEmit() {
-  try {
-    const data = await page.evaluate(() => {
-      const title = document.title;
-      return { title };
+async function startBrowser() {
+    console.log('🚀 Launching browser...');
+    browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
-    io.emit('update', { ts: Date.now(), payload: data });
-  } catch (err) {
-    console.error('❌ scrape error', err.message);
-  }
+    page = await browser.newPage();
+    console.log('🌐 Opening page...');
+    await page.goto(process.env.BLUEOCEAN_URL, { waitUntil: 'networkidle2', timeout: 120000 });
+    console.log('✅ Page loaded successfully!');
 }
 
-// ✅ 3. إعداد Socket.io للاتصال
-io.on('connection', socket => {
-  console.log('💡 client connected', socket.id);
-  socket.on('disconnect', () => console.log('client disconnected', socket.id));
+async function streamPage() {
+    if (!page) return;
+    const screenshot = await page.screenshot({ encoding: 'base64' });
+    io.emit('frame', screenshot);
+}
+
+io.on('connection', (socket) => {
+    console.log('📡 Viewer connected:', socket.id);
+
+    // Handle mouse clicks
+    socket.on('click', async (data) => {
+        if (!page) return;
+        await page.mouse.click(data.x, data.y);
+    });
+
+    // Handle mouse movement (hover)
+    socket.on('move', async (data) => {
+        if (!page) return;
+        await page.mouse.move(data.x, data.y);
+    });
+
+    // Handle scrolling
+    socket.on('scroll', async (data) => {
+        if (!page) return;
+        await page.evaluate(({ deltaY }) => {
+            window.scrollBy(0, deltaY);
+        }, data);
+    });
+
+    // Handle keyboard typing
+    socket.on('type', async (data) => {
+        if (!page) return;
+        await page.keyboard.type(data.text);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('❌ Viewer disconnected:', socket.id);
+    });
 });
 
-// ✅ 4. بدء السيرفر وPuppeteer
 (async () => {
-  await startBrowserAndLogin();
-
-  // يحدث البيانات كل 30 ثانية
-  setInterval(scrapeAndEmit, 30000);
-
-  const PORT = process.env.PORT || 3000;
-  server.listen(PORT, () => console.log(`🚀 lesining to ${PORT}`));
+    await startBrowser();
+    setInterval(streamPage, process.env.SCRAPE_INTERVAL_MS || 1000);
+    server.listen(process.env.PORT, () =>
+        console.log(`🌍 Server running on http://localhost:${process.env.PORT}`)
+    );
 })();
 
