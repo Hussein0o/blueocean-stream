@@ -3,62 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <title>Interactive BlueOcean Stream</title>
-    <style>
-        body {
-            margin: 0;
-            background: #000;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        img#stream {
-            max-width: 100%;
-            max-height: 100%;
-            cursor: crosshair;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <img id="stream" src="" alt="Live Stream">
     <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        const streamImg = document.getElementById('stream');
-
-        socket.on('frame', base64Image => {
-            streamImg.src = 'data:image/png;base64,' + base64Image;
-        });
-
-        // Handle click
-        streamImg.addEventListener('click', e => {
-            const rect = e.target.getBoundingClientRect();
-            socket.emit('click', { x: e.clientX - rect.left, y: e.clientY - rect.top });
-        });
-
-        // Handle hover / move
-        streamImg.addEventListener('mousemove', e => {
-            const rect = e.target.getBoundingClientRect();
-            socket.emit('move', { x: e.clientX - rect.left, y: e.clientY - rect.top });
-        });
-
-        // Handle scroll (wheel)
-        window.addEventListener('wheel', e => {
-            socket.emit('scroll', { deltaY: e.deltaY });
-        });
-
-        // Handle typing (keyboard)
-        window.addEventListener('keydown', e => {
-            if (e.key.length === 1) {
-                socket.emit('type', { text: e.key });
-            } else if (e.key === 'Enter') {
-                socket.emit('type', { text: '\n' });
-            } else if (e.key === 'Backspace') {
-                socket.emit('type', { text: '\b' });
-            }
-        });
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
 

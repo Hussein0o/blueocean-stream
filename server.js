@@ -12,64 +12,82 @@ app.use(express.static('public'));
 
 let browser, page;
 
+// Launch browser
 async function startBrowser() {
     console.log('🚀 Launching browser...');
     browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        headless: false,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--start-maximized'],
+        defaultViewport: null
     });
+    await openPage();
+}
 
-    page = await browser.newPage();
+async function openPage() {
+    if (page && !page.isClosed()) return;
     console.log('🌐 Opening page...');
-    await page.goto(process.env.BLUEOCEAN_URL, { waitUntil: 'networkidle2', timeout: 120000 });
+    page = await browser.newPage();
+    await page.goto(process.env.BLUEOCEAN_URL, {
+        waitUntil: 'networkidle2',
+        timeout: 180000
+    });
     console.log('✅ Page loaded successfully!');
 }
 
-async function streamPage() {
-    if (!page) return;
-    const screenshot = await page.screenshot({ encoding: 'base64' });
-    io.emit('frame', screenshot);
+async function ensurePage() {
+    if (!page || page.isClosed()) {
+        console.log('⚠️ Page closed, reopening...');
+        await openPage();
+    }
 }
 
-io.on('connection', (socket) => {
+async function streamPage() {
+    try {
+        await ensurePage();
+        const screenshot = await page.screenshot({ encoding: 'base64' });
+        io.emit('frame', screenshot);
+    } catch (err) {
+        console.error('❌ Screenshot error:', err.message);
+    }
+}
+
+// Handle socket
+io.on('connection', socket => {
     console.log('📡 Viewer connected:', socket.id);
 
-    // Handle mouse clicks
-    socket.on('click', async (data) => {
-        if (!page) return;
+    socket.on('click', async data => {
+        await ensurePage();
         await page.mouse.click(data.x, data.y);
     });
 
-    // Handle mouse movement (hover)
-    socket.on('move', async (data) => {
-        if (!page) return;
+    socket.on('move', async data => {
+        await ensurePage();
         await page.mouse.move(data.x, data.y);
     });
 
-    // Handle scrolling
-    socket.on('scroll', async (data) => {
-        if (!page) return;
-        await page.evaluate(({ deltaY }) => {
-            window.scrollBy(0, deltaY);
-        }, data);
+    socket.on('wheel', async data => {
+        await ensurePage();
+        await page.mouse.wheel({ deltaX: data.deltaX || 0, deltaY: data.deltaY || 0 });
     });
 
-    // Handle keyboard typing
-    socket.on('type', async (data) => {
-        if (!page) return;
-        await page.keyboard.type(data.text);
+    socket.on('keydown', async data => {
+        await ensurePage();
+        if (!data || !data.code) return;
+        const modifiers = data.modifiers || [];
+        for (let mod of modifiers) await page.keyboard.down(mod);
+        await page.keyboard.down(data.code);
+        for (let mod of modifiers) await page.keyboard.up(mod);
+        await page.keyboard.up(data.code);
     });
 
-    socket.on('disconnect', () => {
-        console.log('❌ Viewer disconnected:', socket.id);
-    });
+    socket.on('disconnect', () => console.log('❌ Viewer disconnected:', socket.id));
 });
 
+// Start
 (async () => {
     await startBrowser();
-    setInterval(streamPage, process.env.SCRAPE_INTERVAL_MS || 1000);
-    server.listen(process.env.PORT, () =>
-        console.log(`🌍 Server running on http://localhost:${process.env.PORT}`)
-    );
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => console.log(`🌍 Server running on http://localhost:${PORT}`));
+    setInterval(streamPage, 500);
 })();
 
