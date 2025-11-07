@@ -1,24 +1,67 @@
 const socket = io();
 const streamImg = document.getElementById('stream');
 
-// Update frame
+// --- Frame update ---
 socket.on('frame', base64 => {
     streamImg.src = 'data:image/png;base64,' + base64;
 });
 
-// Mouse click
+// --- Mouse / Touch ---
+function emitClick(x, y) {
+    socket.emit('click', { x, y });
+}
+
+function emitMove(x, y) {
+    socket.emit('move', { x, y });
+}
+
+// Desktop mouse
 streamImg.addEventListener('click', e => {
     const rect = e.target.getBoundingClientRect();
-    socket.emit('click', { x: e.clientX - rect.left, y: e.clientY - rect.top });
+    emitClick(e.clientX - rect.left, e.clientY - rect.top);
+
+    // Fullscreen on first click
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.warn('Fullscreen error:', err);
+        });
+    }
 });
 
-// Mouse move
 streamImg.addEventListener('mousemove', e => {
     const rect = e.target.getBoundingClientRect();
-    socket.emit('move', { x: e.clientX - rect.left, y: e.clientY - rect.top });
+    emitMove(e.clientX - rect.left, e.clientY - rect.top);
 });
 
-// Smooth scroll handler
+// Mobile touch
+let lastTouchY = null;
+streamImg.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const rect = e.target.getBoundingClientRect();
+    const touch = e.touches[0];
+    emitClick(touch.clientX - rect.left, touch.clientY - rect.top);
+    lastTouchY = touch.clientY;
+});
+
+streamImg.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const rect = e.target.getBoundingClientRect();
+    const touch = e.touches[0];
+    emitMove(touch.clientX - rect.left, touch.clientY - rect.top);
+
+    if (lastTouchY !== null) {
+        const deltaY = lastTouchY - touch.clientY;
+        socket.emit('wheel', { deltaX: 0, deltaY });
+        lastTouchY = touch.clientY;
+    }
+});
+
+streamImg.addEventListener('touchend', e => {
+    e.preventDefault();
+    lastTouchY = null;
+});
+
+// --- Smooth scroll (desktop wheel) ---
 let scrollBuffer = 0;
 let scrollTimer = null;
 window.addEventListener('wheel', e => {
@@ -30,14 +73,14 @@ window.addEventListener('wheel', e => {
                 scrollTimer = null;
                 return;
             }
-            const step = scrollBuffer * 0.2; // smooth factor
+            const step = scrollBuffer * 0.2;
             scrollBuffer -= step;
-            socket.emit('wheel', { deltaY: step });
-        }, 16); // roughly 60fps
+            socket.emit('wheel', { deltaX: 0, deltaY: step });
+        }, 16);
     }
 });
 
-// Keyboard input
+// --- Keyboard ---
 window.addEventListener('keydown', e => {
     let modifiers = [];
     if (e.shiftKey) modifiers.push('Shift');
@@ -47,4 +90,3 @@ window.addEventListener('keydown', e => {
     e.preventDefault();
     socket.emit('keydown', { code: e.code, modifiers });
 });
-

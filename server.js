@@ -12,12 +12,11 @@ app.use(express.static('public'));
 
 let browser, page;
 
-// Launch browser
 async function startBrowser() {
     console.log('🚀 Launching browser...');
     browser = await puppeteer.launch({
         headless: false,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--start-maximized'],
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--kiosk'],
         defaultViewport: null
     });
     await openPage();
@@ -31,6 +30,7 @@ async function openPage() {
         waitUntil: 'networkidle2',
         timeout: 180000
     });
+    await page.setViewport({ width: 1920, height: 1080 });
     console.log('✅ Page loaded successfully!');
 }
 
@@ -51,7 +51,6 @@ async function streamPage() {
     }
 }
 
-// Handle socket
 io.on('connection', socket => {
     console.log('📡 Viewer connected:', socket.id);
 
@@ -83,11 +82,9 @@ io.on('connection', socket => {
     socket.on('disconnect', () => console.log('❌ Viewer disconnected:', socket.id));
 });
 
-// Start
 (async () => {
     await startBrowser();
     const PORT = process.env.PORT || 3000;
     server.listen(PORT, () => console.log(`🌍 Server running on http://localhost:${PORT}`));
     setInterval(streamPage, 500);
 })();
-
