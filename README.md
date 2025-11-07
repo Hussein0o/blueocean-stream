@@ -77,9 +77,19 @@ Go to 👉 [http://localhost:3000](http://localhost:3000)
 ## 💻 Usage
 
 - The web page will show a **live feed** of the target page.  
-- You can **move your mouse**, **click**, **scroll**, and **type** as if you’re on the real page.  
+- You can **move your mouse**, **click**, **scroll**, and **type** as if you’re on the real page.
+- On mobile, touch and swipe gestures are supported.
+- The interface enters full screen automatically on first interaction.
 - Ideal for remote BlueOcean/Jenkins visualizations or controlled browser automation demos.
 
+---
+
+## 📝 Notes
+
+- Puppeteer launches Chrome in kiosk mode for full screen streaming.
+- The stream updates every 500ms.
+- Make sure the BlueOcean URL is accessible from the server.
+  
 ---
 
 ## 🧠 Troubleshooting
